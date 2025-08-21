@@ -675,7 +675,7 @@ if __name__ == "__main__":
         print("Sistema WordPress Parser - Processamento concluído!")
         print(f"{'='*50}")
     else:
-        print("[ERRO] Nenhum veículo foi processado ou houve erro no processamento."), url, re.IGNORECASE)
+        print("[ERRO] Nenhum veículo foi processado ou houve erro no processamento."), url, re.IGNORECASE
         if match:
             return int(match.group(1))
         # Se não encontrou número, coloca no final
