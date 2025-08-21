@@ -224,7 +224,7 @@ def normalize_fotos(fotos_data: Any) -> List[str]:
     def extract_number_from_url(url):
         """Extrai o número do final da URL antes da extensão"""
         # Procura por padrão como CRETA-12.avif, NIVUS-5.avif, etc.
-        match = re.search(r'-(\d+)\.(?:avif|jpg|jpeg|png|webp)$', url, re.IGNORECASE
+        match = re.search(r'-(\d+)\.(?:avif|jpg|jpeg|png|webp)
 
 # =================== PARSER WORDPRESS =======================
 
@@ -675,7 +675,7 @@ if __name__ == "__main__":
         print("Sistema WordPress Parser - Processamento concluído!")
         print(f"{'='*50}")
     else:
-        print("[ERRO] Nenhum veículo foi processado ou houve erro no processamento."), url, re.IGNORECASE
+        print("[ERRO] Nenhum veículo foi processado ou houve erro no processamento."), url, re.IGNORECASE)
         if match:
             return int(match.group(1))
         # Se não encontrou número, coloca no final
