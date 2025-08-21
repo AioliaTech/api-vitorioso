@@ -248,12 +248,33 @@ class WordPressParser:
             if not isinstance(post, dict):
                 continue
             
+            # Debug: mostra os campos disponíveis (apenas para o primeiro post)
+            if len(parsed_vehicles) == 0:
+                print(f"[DEBUG] Campos disponíveis no XML:")
+                for key in sorted(post.keys()):
+                    value = post[key]
+                    if isinstance(value, str) and len(value) > 50:
+                        value = value[:50] + "..."
+                    print(f"  {key}: {value}")
+                print()
+            
             # Extrai dados básicos do veículo
             marca = self._safe_get_post_field(post, ["Marca", "marca", "_marca"])
             modelo = self._safe_get_post_field(post, ["Modelo", "modelo", "_modelo"])
             versao = self._safe_get_post_field(post, ["Verso", "versao", "_versao", "Version"])
             carroceria = self._safe_get_post_field(post, ["_carroceria", "carroceria", "Carroceria"])
             opcionais = self._safe_get_post_field(post, ["Opcionais", "opcionais", "_opcionais"])
+            
+            # Campos específicos do XML fornecido
+            cor = self._safe_get_post_field(post, ["Cores", "cor", "_cor", "Color"])
+            ano_campo = self._safe_get_post_field(post, ["_ano", "ano", "Ano", "Year"])
+            km = self._safe_get_post_field(post, ["_quilometragem", "quilometragem", "KM", "km"])
+            combustivel = self._safe_get_post_field(post, ["_combustivel", "combustivel", "Combustivel"])
+            cambio = self._safe_get_post_field(post, ["_cambio", "cambio", "Cambio"])
+            preco = self._safe_get_post_field(post, ["_valor", "valor", "preco", "Preco", "Price"])
+            
+            # Processa o campo ano que pode vir como "2024/2025"
+            ano_fabricacao, ano_modelo = self._extract_anos(ano_campo)
             
             # Determina categoria
             categoria_final = definir_categoria_veiculo(modelo, carroceria, opcionais)
@@ -272,17 +293,17 @@ class WordPressParser:
                 "versao": self._clean_version(versao or ""),
                 "marca": marca,
                 "modelo": modelo,
-                "ano": self._safe_get_post_field(post, ["_ano", "ano", "Ano"]),
-                "ano_fabricacao": None,  # WordPress geralmente não separa
-                "km": self._safe_get_post_field(post, ["_quilometragem", "quilometragem", "KM"]),
-                "cor": self._safe_get_post_field(post, ["Cores", "cor", "_cor"]),
-                "combustivel": self._safe_get_post_field(post, ["_combustivel", "combustivel", "Combustivel"]),
-                "cambio": self._safe_get_post_field(post, ["_cambio", "cambio", "Cambio"]),
+                "ano": ano_modelo,
+                "ano_fabricacao": ano_fabricacao,
+                "km": km,
+                "cor": cor,
+                "combustivel": combustivel,
+                "cambio": cambio,
                 "motor": motor_info,
                 "portas": None,  # Geralmente não disponível
                 "categoria": categoria_final,
                 "cilindrada": None,  # Para carros, geralmente não usado
-                "preco": converter_preco(self._safe_get_post_field(post, ["_valor", "valor", "preco", "Preco"])),
+                "preco": converter_preco(preco),
                 "opcionais": opcionais or "",
                 "fotos": fotos
             })
@@ -336,7 +357,12 @@ class WordPressParser:
                 # Remove CDATA se presente
                 if isinstance(value, str) and value.startswith('<![CDATA['):
                     value = value.replace('<![CDATA[', '').replace(']]>', '').strip()
-                return str(value).strip() if value else None
+                
+                # Converte para string e remove espaços
+                if value is not None:
+                    str_value = str(value).strip()
+                    # Retorna None se for string vazia
+                    return str_value if str_value else None
         return None
     
     def _extract_photos_wordpress(self, post: Dict) -> List[str]:
@@ -375,6 +401,26 @@ class WordPressParser:
                 unique_photos.append(photo)
         
         return unique_photos
+    
+    def _extract_anos(self, ano_campo: str) -> Tuple[Optional[str], Optional[str]]:
+        """
+        Extrai ano de fabricação e ano do modelo do campo _ano
+        Exemplo: "2024/2025" -> (ano_fabricacao="2024", ano_modelo="2025")
+        """
+        if not ano_campo:
+            return None, None
+        
+        # Se contém barra, separa
+        if "/" in ano_campo:
+            partes = ano_campo.split("/")
+            if len(partes) == 2:
+                ano_fabricacao = partes[0].strip()
+                ano_modelo = partes[1].strip()
+                return ano_fabricacao, ano_modelo
+        
+        # Se não tem barra, usa o mesmo valor para ambos
+        ano_limpo = ano_campo.strip()
+        return ano_limpo, ano_limpo
     
     def _extract_motor_info(self, versao: str) -> Optional[str]:
         """
