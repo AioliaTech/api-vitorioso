@@ -151,6 +151,7 @@ def normalize_fotos(fotos_data: Any) -> List[str]:
     - Objeto único: {"url": "url1"}
     - String única: "url1"
     - String com separador pipe: "url1|url2|url3"
+    - String com separador vírgula: "url1,url2,url3"
     
     Retorna sempre: ["url1", "url2", "url3"]
     """
@@ -163,10 +164,24 @@ def normalize_fotos(fotos_data: Any) -> List[str]:
         """Extrai URL de um item que pode ser string, dict ou outro tipo"""
         if isinstance(item, str):
             url = item.strip()
-            # Se a string contém pipes, divide
+            if not url:
+                return []
+            
+            # Se a string contém pipes, divide por pipe
             if "|" in url:
-                return url.split("|")
-            return [url] if url else []
+                return [u.strip() for u in url.split("|") if u.strip()]
+            # Se a string contém vírgulas, divide por vírgula
+            elif "," in url:
+                urls = [u.strip() for u in url.split(",") if u.strip()]
+                # Filtra apenas URLs válidas (que contêm http ou começam com /)
+                valid_urls = []
+                for u in urls:
+                    if ("http" in u or u.startswith("/")) and len(u) > 10:
+                        valid_urls.append(u)
+                return valid_urls
+            else:
+                return [url] if url else []
+                
         elif isinstance(item, dict):
             # Tenta várias chaves possíveis para URL
             for key in ["url", "URL", "src", "IMAGE_URL", "path", "link", "href"]:
@@ -201,7 +216,7 @@ def normalize_fotos(fotos_data: Any) -> List[str]:
     seen = set()
     normalized = []
     for url in result:
-        if url and url not in seen and url.strip():
+        if url and url not in seen and url.strip() and len(url) > 10:
             seen.add(url)
             normalized.append(url.strip())
     
@@ -368,39 +383,46 @@ class WordPressParser:
     def _extract_photos_wordpress(self, post: Dict) -> List[str]:
         """
         Extrai fotos do post do WordPress
-        Campos possíveis: ImageURL, _galeria, ImageFeatured, fotos, etc.
+        Prioriza campos específicos para evitar mistura de fotos
         """
-        fotos_raw = []
-        
-        # Campos onde podem estar as fotos
-        foto_fields = [
-            "ImageURL", "_galeria", "galeria", "_imagens", "imagens", 
-            "ImageFeatured", "fotos", "_fotos", "images", "_images"
+        # Ordem de prioridade dos campos de foto
+        foto_fields_priority = [
+            "_galeria",      # Campo principal com todas as fotos
+            "ImageURL",      # URLs das imagens 
+            "ImageFeatured", # Imagem destacada
         ]
         
-        for field in foto_fields:
+        # Tenta cada campo por ordem de prioridade
+        for field in foto_fields_priority:
             if field in post and post[field]:
                 value = post[field]
                 # Remove CDATA se presente
                 if isinstance(value, str) and value.startswith('<![CDATA['):
                     value = value.replace('<![CDATA[', '').replace(']]>', '').strip()
-                fotos_raw.append(value)
+                
+                # Processa as fotos encontradas
+                fotos_normalizadas = normalize_fotos(value)
+                
+                # Se encontrou fotos válidas, retorna (não mistura campos)
+                if fotos_normalizadas:
+                    print(f"[DEBUG] Usando campo '{field}' para fotos: {len(fotos_normalizadas)} foto(s)")
+                    return fotos_normalizadas
         
-        # Processa todas as fotos encontradas
-        all_photos = []
-        for foto_data in fotos_raw:
-            normalized = normalize_fotos(foto_data)
-            all_photos.extend(normalized)
+        # Se não encontrou em campos prioritários, busca em outros
+        outros_campos = ["galeria", "_imagens", "imagens", "fotos", "_fotos", "images", "_images"]
+        for field in outros_campos:
+            if field in post and post[field]:
+                value = post[field]
+                if isinstance(value, str) and value.startswith('<![CDATA['):
+                    value = value.replace('<![CDATA[', '').replace(']]>', '').strip()
+                
+                fotos_normalizadas = normalize_fotos(value)
+                if fotos_normalizadas:
+                    print(f"[DEBUG] Usando campo alternativo '{field}' para fotos: {len(fotos_normalizadas)} foto(s)")
+                    return fotos_normalizadas
         
-        # Remove duplicatas mantendo ordem
-        seen = set()
-        unique_photos = []
-        for photo in all_photos:
-            if photo not in seen:
-                seen.add(photo)
-                unique_photos.append(photo)
-        
-        return unique_photos
+        print(f"[DEBUG] Nenhuma foto encontrada para este veículo")
+        return []
     
     def _extract_anos(self, ano_campo: str) -> Tuple[Optional[str], Optional[str]]:
         """
