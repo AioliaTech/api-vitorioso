@@ -224,7 +224,7 @@ def normalize_fotos(fotos_data: Any) -> List[str]:
     def extract_number_from_url(url):
         """Extrai o número do final da URL antes da extensão"""
         # Procura por padrão como CRETA-12.avif, NIVUS-5.avif, etc.
-        match = re.search(r'-(\d+)\.(?:avif|jpg|jpeg|png|webp)$', url, re.IGNORECASE)
+        match = re.search(r'-(\d+)\.(?:avif|jpg|jpeg|png|webp)$', url, re.IGNORECASE
 
 # =================== PARSER WORDPRESS =======================
 
